@@ -82,8 +82,8 @@ begin
   puts JSON.pretty_generate(out)
 
 rescue => e
-  STDERR.puts "Error: #{e.class}: #{e.message}"
-  STDERR.puts e.backtrace.take(20).join("\n")
+  warn "Error: #{e.class}: #{e.message}"
+  warn e.backtrace.take(20).join("\n")
 ensure
   if driver
     puts "Closing browser..."
