@@ -17,7 +17,7 @@ options = {
 }
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: main.rb [options]"
+  opts.banner = "Usage: init.rb [options]"
   opts.on("--headless [BOOLEAN]") { |v| options[:headless] = v != "false" }
   opts.on("--datadir FILE") { |v| options[:datadir] = v }
   opts.on("--email EMAIL") { |v| options[:email] = v }
@@ -79,7 +79,6 @@ begin
 
   File.open(options[:output], 'w') { |f| f.write(JSON.pretty_generate(out)) }
   puts "Saved #{items.size} items to #{options[:output]}"
-  puts JSON.pretty_generate(out)
 
 rescue => e
   warn "Error: #{e.class}: #{e.message}"

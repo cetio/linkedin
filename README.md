@@ -15,7 +15,7 @@ It's designed to be human-friendly, tolerant of LinkedIn's rate limits, and to a
 Chromium Default profile:
 
 ```bash
-ruby main.rb --datadir /home/john/.config/thorium/
+ruby init.rb --datadir /home/john/.config/thorium/
 ```
 
 > [!TIP]
@@ -25,7 +25,7 @@ Login credentials:
 
 
 ```bash
-ruby main.rb --email john@example.com --password Pa55W0rD
+ruby init.rb --email john@example.com --password Pa55W0rD
 ```
 
 ## Output
