@@ -3,7 +3,9 @@ require 'nokogiri'
 require 'json'
 require 'optparse'
 require 'time'
-require_relative 'parse'
+require_relative 'parser'
+require_relative 'course'
+require_relative 'path'
 require 'date'
 
 class LinkedIn
@@ -112,7 +114,7 @@ class LinkedIn
     sleep(rand(min..max) + rand * 0.3)
   end
 
-  def learning_completed_show_more()
+  def learning_show_more()
     max_attempts = 5
     attempts = 0
 
@@ -186,190 +188,51 @@ class LinkedIn
         @driver.find_elements(css: '.lls-card-headline').length > items.size
       }
 
-      state = learning_completed_show_more()
+      state = learning_show_more()
       sleep 0.5 unless state
 
       html = Nokogiri::HTML(@driver.page_source)
-      items |= Parser.extract_items(html)
+      new_items = Parser.extract(html, self)
+      
+      # Add new items, avoiding duplicates
+      new_items.each do |item|
+        next if items.any? { |existing| existing.url == item.url }
+        items << item
+      end
+      
       break unless state
     end
+    
     items
   end
 
-  # TODO: Technically in fringe cases this can cause a stack overflow.
-  #       I'm not particularly concerned about it but it should be addressed.
-  def learning_course_navigate(url)
-    refresh = @driver.current_url == url
-    if refresh
-      @driver.navigate.refresh
-    else
-      @driver.navigate.to(url)
-    end
-
+  def learning_in_progress()
+    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/in-progress")
     @wait.until {
-      @driver.find_elements(css: '.classroom-workspace-overview__header').any? ||
-      @driver.find_elements(css: '.error-body__content').any?
+      @driver.find_elements(css: '.lls-card-headline').any?
     }
 
-    return if refresh
+    items = []
+    loop do
+      scroll_dynamic()
+      @wait.until {
+        @driver.find_elements(css: '.lls-card-headline').length > items.size
+      }
 
-    backoff = 0
-    until @driver.find_elements(css: '.error-body__content').empty?
-      backoff += 1
-      warn "Client may be rate limited!"
-      humanized_sleep(20, 30 + (backoff * 10))
-      learning_course_navigate(url);
-    end
+      state = learning_show_more()
+      sleep 0.5 unless state
 
-    until @driver.find_elements(css: '.classroom-workspace-overview__details-meta').any? { |e| e.displayed? }
-      humanized_sleep(1, 2)
-      learning_course_navigate(url);
-    end
-  end
-
-  def learning_course_json(url, title)
-    if is_cached?(url)
-      return @cache[url]
-    end
-
-    learning_course_navigate(url)
-    humanized_sleep(1, 2)
-    scroll_dynamic()
-    humanized_sleep(1, 2)
-    html = Nokogiri::HTML(@driver.page_source)
-
-    rec = {
-      "type" => 'course',
-      "url" => url,
-      "title" => title,
-      "authors" => Parser.get_authors(html),
-      "minutes" => Parser.get_minutes(html),
-      "difficulty" => Parser.get_difficulty(html),
-      "updated_date" => Parser.get_updated_date(html),
-      "ratings" => Parser.get_ratings(html),
-      "ratings_count" => Parser.get_ratings_count(html),
-      "certified" => Parser.has_certifying_organizations?(html),
-      "credits" => {},
-    }
-    if rec["certified"]
-      begin
-        creds = Parser.get_course_credits(html)
-
-        unless creds.empty?
-          rec["credits"] = creds rescue {}
-        end
-      rescue => e
-        puts "Error parsing credits for #{url}: #{e.class}: #{e.message}"
-      end
-    end
-
-    @cache[url] = rec
-    save_cache_atomic()
-    rec
-  end
-
-  def learning_path_navigate(url)
-    refresh = @driver.current_url == url
-    if refresh
-      @driver.navigate.refresh
-    else
-      @driver.navigate.to(url)
-    end
-
-    wait.until {
-        @driver.find_elements(css: '.lls-card-headline').any? ||
-        @driver.find_elements(css: '.error-body__content').any?
-    }
-
-    return if refresh
-
-    backoff = 0
-    until @driver.find_elements(css: '.error-body__content').empty?
-      backoff += 1
-      warn "Client may be rate limited!"
-      humanized_sleep(20, 30 + (backoff * 10))
-      learning_path_navigate(url);
-    end
-
-    until @driver.find_elements(css: '.path-body-v2__certification-provider-name').any? { |e| e.displayed? } ||
-        @driver.find_elements(css: '.path-body-v2__header-provider').any? { |e| e.displayed? }
-      humanized_sleep(1, 2)
-      learning_path_navigate(url);
-    end
-  end
-
-  def learning_path_json(url, title)
-    if is_cached?(url)
-      return @cache[url]
-    end
-
-    learning_path_navigate(url)
-    humanized_sleep(1, 2)
-    html = Nokogiri::HTML(@driver.page_source)
-
-    items = Parser.extract_items(html)
-    rec = {
-      "type" => 'path',
-      "url" => url,
-      "title" => title,
-      "provider" => Parser.get_provider(html),
-      "courses" => [],
-      "minutes" => 0,
-      "difficulty" => nil,
-      "updated_date" => nil,
-      "ratings" => 0,
-      "ratings_count" => 0,
-      "certified" => false,
-      "credits" => {},
-    }
-
-    items.each do |_c|
-      c = @cache[_c[:url]]
-      c = learning_course_json(_c[:url], _c[:title]) if c.nil?
+      html = Nokogiri::HTML(@driver.page_source)
+      new_items = Parser.extract(html, self)
       
-      # TODO: Maybe store only the URL and not the entire course.
-      rec["courses"] << c["url"]
-      rec["updated_date"] = [rec["updated_date"], Date.parse(c["updated_date"].to_s)].compact.max
-      rec["minutes"] += c["minutes"]
-      rec["ratings"] += c["ratings"]
-      rec["ratings_count"] += c["ratings_count"]
-      rec["certified"] |= c["certified"]
-
-      c["credits"].each do |type, count|
-        unless rec["credits"][type].nil?
-          rec["credits"][type] += count;
-        else
-          rec["credits"][type] = count;
-        end
+      # Add new items, avoiding duplicates
+      new_items.each do |item|
+        next if items.any? { |existing| existing.url == item.url }
+        items << item
       end
-
-      rec["difficulty"] = case c["difficulty"]
-        when /Advanced/
-          "Advanced"
-        when /Intermediate/
-          "Intermediate"
-        when /Beginner/
-          "Beginner"
-        when /General/
-          "General"
-        else
-          rec["difficulty"]
-      end
+      
+      break unless state
     end
-    rec["ratings"] = (rec["ratings"] / (rec["courses"].size.to_f || 1.0)).round(1)
-
-    @cache[url] = rec
-    save_cache_atomic()
-    rec
-  end
-
-  def learning_json(url, title)
-    if url.start_with?("https://www.linkedin.com/learning/paths")
-      learning_path_json(url, title)
-    elsif url.start_with?("https://www.linkedin.com/learning")
-      learning_course_json(url, title)
-    else
-      raise "URLs must be absolute, beginning with https://www.linkedin.com/learning. Provided: #{url} for #{title}.";
-    end
+    items
   end
 end

@@ -3,9 +3,8 @@ require 'selenium-webdriver'
 require 'json'
 require 'optparse'
 require 'time'
-require_relative 'parse'
-require_relative 'linkedin'
 require 'date'
+require_relative 'linkedin'
 
 options = {
   headless: true,
@@ -58,17 +57,18 @@ begin
     options[:cache]
   )
 
-  items = linkedin.learning_completed()
-  cached = items.sum { |u| linkedin.is_cached?(u[:url]) ? 1 : 0 }
+  #items = linkedin.learning_completed()
+  items = linkedin.learning_in_progress()
+  cached = items.sum { |item| linkedin.is_cached?(item.url) ? 1 : 0 }
   puts "Collected #{items.size} items, #{cached} cached."
   eta_secs = (items.size - cached) * 4 + (((items.size - cached) / 10) * 30)
   eta_mins = (eta_secs / 60.0).truncate
   eta_secs -= eta_mins * 60
   puts "ETA: #{eta_mins}m #{eta_secs}s"
 
-  json = items.map { |u| 
-    puts "#{items.index(u)}/#{items.size}: #{u[:title]}"
-    linkedin.learning_json(u[:url], u[:title]) 
+  json = items.map { |item| 
+    puts "#{items.index(item)}/#{items.size}: #{item.title}"
+    item.to_hash
   }
 
   out = {
