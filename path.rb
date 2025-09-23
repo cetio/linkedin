@@ -14,6 +14,7 @@ class Path
     @linkedin = linkedin
     @courses = []
     @credits = {}
+    @minutes = 0
     @minutes_remaining = 0
     @ratings = 0
     @ratings_count = 0
@@ -24,7 +25,7 @@ class Path
   def navigate()
     return unless @linkedin
     return if @url.nil? || @title.nil?
-    
+
     refresh = @linkedin.driver.current_url == @url
     if refresh
       @linkedin.driver.navigate.refresh
@@ -58,7 +59,7 @@ class Path
   def populate
     return unless @linkedin
     return if @url.nil? || @title.nil?
-    
+
     # Technically not yet populated, but this is easy.
     @populated = true
     if @linkedin.is_cached?(@url)
@@ -68,22 +69,22 @@ class Path
     # Navigate to path if not already there
     navigate()
     @linkedin.humanized_sleep(1, 2)
-    
+
     # Get fresh page source
     html = Nokogiri::HTML(@linkedin.driver.page_source)
 
     # Populate from HTML
     @provider = Parser.get_provider(html)
-    
+
     # Extract course items from the path (basic data only)
     # TODO: Not this.
     items = Parser.extract_basic(html)
-    
+
     # Process each course in the path
     items.each do |course_item|
       course_url = course_item[:url]
       course_title = course_item[:title]
-      
+
       # Get course data (from cache or by parsing)
       course_data = @linkedin.cache[course_url]
       if course_data.nil?
@@ -93,35 +94,37 @@ class Path
         course.populate  # Will navigate and populate
         course_data = course.to_hash
       end
-      
+
       # Add course URL to our courses list
       @courses << course_data["url"]
-      
+
       # Aggregate data from courses
       aggregate_course_data(course_data)
     end
-    
+
     @ratings = (@ratings / (@courses.size.to_f || 1.0)).round(1)
-    
+
     @linkedin.cache[@url] = to_hash
     @linkedin.save_cache_atomic()
   end
 
   def aggregate_course_data(course_data)
     # Update the most recent updated_date
+    # TODO: completion_date
     course_updated_date = Date.parse(course_data["updated_date"].to_s) if course_data["updated_date"]
     @updated_date = [@updated_date, course_updated_date].compact.max
-    
+
     # Sum up minutes
     @minutes += course_data["minutes"] || 0
-    
+    @minutes_remaining += course_data["minutes"] || 0
+
     # Sum up ratings and ratings_count
     @ratings += course_data["ratings"] || 0
     @ratings_count += course_data["ratings_count"] || 0
-    
+
     # Set certified if any course is certified
     @certified |= course_data["certified"] || false
-    
+
     # Aggregate credits
     if course_data["credits"]
       course_data["credits"].each do |type, count|
@@ -132,7 +135,7 @@ class Path
         end
       end
     end
-    
+
     # Set difficulty based on course difficulty (Advanced > Intermediate > Beginner > General)
     course_difficulty = course_data["difficulty"]
     @difficulty = determine_highest_difficulty(@difficulty, course_difficulty)
@@ -145,10 +148,10 @@ class Path
       "Beginner" => 2,
       "General" => 1
     }
-    
+
     current_level = difficulty_levels[current_difficulty] || 0
     new_level = difficulty_levels[new_difficulty] || 0
-    
+
     if new_level > current_level
       new_difficulty
     else

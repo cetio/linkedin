@@ -7,6 +7,7 @@ class Course
   attr_accessor :linkedin, :populated
   # If completed, minutes_remaining is nil.
   # If in progress, completion_date is nil.
+  # TODO: learning_path || nil
   attr_accessor :url, :title, :minutes_remaining, :completion_date, :authors, :difficulty, :updated_date, :ratings, :ratings_count, :certified, :credits
 
   def initialize(linkedin = nil)
@@ -18,7 +19,7 @@ class Course
   def navigate()
     return unless @linkedin
     return if @url.nil? || @title.nil?
-    
+
     refresh = @linkedin.driver.current_url == @url
     if refresh
       @linkedin.driver.navigate.refresh
@@ -50,7 +51,7 @@ class Course
   def populate
     return unless @linkedin
     return if @url.nil? || @title.nil?
-    
+
     # Technically not yet populated, but this is easy.
     @populated = true
     if @linkedin.is_cached?(@url)
@@ -62,9 +63,10 @@ class Course
     @linkedin.humanized_sleep(1, 2)
     @linkedin.scroll_dynamic()
     @linkedin.humanized_sleep(1, 2)
-    
+
     html = Nokogiri::HTML(@linkedin.driver.page_source)
 
+    # We cannot scrape completion date or minutes remaining from the HTML here.
     @authors = Parser.get_authors(html)
     @minutes = Parser.get_minutes(html)
     @difficulty = Parser.get_difficulty(html)
@@ -82,7 +84,7 @@ class Course
         puts "Error parsing credits for #{@url}: #{e.class}: #{e.message}"
       end
     end
-    
+
     @linkedin.cache[@url] = to_hash
     @linkedin.save_cache_atomic()
   end
@@ -98,6 +100,7 @@ class Course
       "minutes_remaining" => @minutes_remaining,
       "difficulty" => @difficulty,
       "updated_date" => @updated_date,
+      "completion_date" => @completion_date,
       "ratings" => @ratings,
       "ratings_count" => @ratings_count,
       "certified" => @certified,
@@ -113,6 +116,7 @@ class Course
     @minutes_remaining = hash["minutes_remaining"]
     @difficulty = hash["difficulty"]
     @updated_date = hash["updated_date"]
+    @updated_date = hash["completion_date"]
     @ratings = hash["ratings"]
     @ratings_count = hash["ratings_count"]
     @certified = hash["certified"]

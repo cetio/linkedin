@@ -23,22 +23,30 @@ module Parser
 
       href = anchor['href'].strip
       url = (URI.join('https://www.linkedin.com', href).to_s rescue href).split("?")[0]
-      next if url.start_with?("https://www.linkedin.com/learning/videos")
-      next if url.start_with?("https://www.linkedin.com/learning/paths")
-      
+      # No support for videos.
+      if url.start_with?("https://www.linkedin.com/learning/videos")
+        warn "Dropped video item."
+        next
+      end
+
       footer = html.css('.lls-card-detail-card-body__footer')[index]
       metadata = footer.at_css('.lls-card-meta-list')
       minutes_remaining = nil
       completion_date = nil
 
-      puts metadata.at_css('.lls-card-duration')
       unless metadata.nil? || metadata.at_css('.lls-card-duration').nil?
         dur = metadata.at_css('.lls-card-duration').text.to_s.strip
         hours = dur[/(\d+)h/, 1].to_i
         mins = dur[/(\d+)m/, 1].to_i
         minutes_remaining = hours * 60 + mins
       end
-      
+
+      metadata = footer if metadata.nil? && !footer.at_css('.lls-card-completion-state--completed').nil?
+      unless metadata.nil? || metadata.at_css('.lls-card-completion-state--completed').nil?
+        date = metadata.at_css('.lls-card-completion-state--completed').text.to_s.strip
+        completion_date = Date.strptime(date.split(' ')[1].strip, "%m/%d/%Y")
+      end
+
       if url.start_with?("https://www.linkedin.com/learning/paths")
         path = Path.new(instance)
         path.url = url
@@ -49,6 +57,7 @@ module Parser
         course.url = url
         course.title = title
         course.minutes_remaining = minutes_remaining
+        course.completion_date = completion_date
         results << course
       end
     end
@@ -74,7 +83,7 @@ module Parser
       href = anchor['href'].strip
       url = (URI.join('https://www.linkedin.com', href).to_s rescue href).split("?")[0]
       next if url.start_with?("https://www.linkedin.com/learning/videos")
-      
+
       results << { title: title, url: url }
     end
 
@@ -118,8 +127,8 @@ module Parser
   end
 
   def self.get_authors(html)
-    html.at_css(".classroom-authors-summary__names").text.to_s.strip.split(' and ') rescue 
-    html.at_css(".instructor__name").text.to_s.strip.split("\n")[0] rescue 
+    html.at_css(".classroom-authors-summary__names").text.to_s.strip.split(' and ') rescue
+    html.at_css(".instructor__name").text.to_s.strip.split("\n")[0] rescue
     html.at_css(".classroom-content-provider__metadata").at_css("._bodyText_1e5nen").text.to_s.strip.sub(/^Author: /, '') rescue nil
   end
 

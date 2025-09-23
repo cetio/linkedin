@@ -30,8 +30,8 @@ class LinkedIn
   def save_cache_atomic()
     begin
       tmp = "#{@cache_dir}.tmp"
-      File.open(tmp, "w") { |f| 
-        f.write(JSON.pretty_generate(@cache)) 
+      File.open(tmp, "w") { |f|
+        f.write(JSON.pretty_generate(@cache))
       }
       File.rename(tmp, @cache_dir)
       true
@@ -130,8 +130,8 @@ class LinkedIn
       end
 
       begin
-        @wait.until { 
-          btn.displayed? && btn.enabled? && btn.attribute('aria-disabled') != 'true' 
+        @wait.until {
+          btn.displayed? && btn.enabled? && btn.attribute('aria-disabled') != 'true'
         }
       rescue Selenium::WebDriver::Error::TimeoutError
         return false
@@ -175,8 +175,21 @@ class LinkedIn
     end
   end
 
-  def learning_completed()
-    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/completed")
+  def learning_collect(variety)
+    raise "Unsupported variety, only 'all', 'completed', 'in-progress', and 'saved' are supported!" unless
+      variety == 'all' ||
+      variety == 'completed' ||
+      variety == 'in-progress' ||
+      variety == 'saved'
+
+    if variety == 'all'
+      return learning_collect('completed') + learning_collect('in-progress') + learning_collect('saved')
+    end
+
+    # TODO: This needs to make sure the page loads before waiting and it fails on saved library items.
+    # TODO: This needs to be able to handle errors/rate limiting on the page.
+    # TODO: This may not be collecting all items correctly and the logic is quite poor.
+    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/#{variety}")
     @wait.until {
       @driver.find_elements(css: '.lls-card-headline').any?
     }
@@ -193,16 +206,16 @@ class LinkedIn
 
       html = Nokogiri::HTML(@driver.page_source)
       new_items = Parser.extract(html, self)
-      
+
       # Add new items, avoiding duplicates
       new_items.each do |item|
         next if items.any? { |existing| existing.url == item.url }
         items << item
       end
-      
+
       break unless state
     end
-    
+
     items
   end
 
@@ -224,13 +237,13 @@ class LinkedIn
 
       html = Nokogiri::HTML(@driver.page_source)
       new_items = Parser.extract(html, self)
-      
+
       # Add new items, avoiding duplicates
       new_items.each do |item|
         next if items.any? { |existing| existing.url == item.url }
         items << item
       end
-      
+
       break unless state
     end
     items

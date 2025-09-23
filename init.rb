@@ -52,13 +52,13 @@ driver = nil
 begin
   driver = start_driver(options[:headless], options[:datadir])
   linkedin = LinkedIn.new(
-    driver, 
-    options[:email], options[:password], 
+    driver,
+    options[:email], options[:password],
     options[:cache]
   )
 
-  #items = linkedin.learning_completed()
-  items = linkedin.learning_in_progress()
+  # TODO: Automatically propagate all data? Paths should go last otherwise it can be ungodly slow.
+  items = linkedin.learning_collect('completed')
   cached = items.sum { |item| linkedin.is_cached?(item.url) ? 1 : 0 }
   puts "Collected #{items.size} items, #{cached} cached."
   eta_secs = (items.size - cached) * 4 + (((items.size - cached) / 10) * 30)
@@ -66,7 +66,7 @@ begin
   eta_secs -= eta_mins * 60
   puts "ETA: #{eta_mins}m #{eta_secs}s"
 
-  json = items.map { |item| 
+  json = items.map { |item|
     puts "#{items.index(item)}/#{items.size}: #{item.title}"
     item.to_hash
   }
