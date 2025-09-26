@@ -23,11 +23,6 @@ module Parser
 
       href = anchor['href'].strip
       url = (URI.join('https://www.linkedin.com', href).to_s rescue href).split("?")[0]
-      # No support for videos.
-      if url.start_with?("https://www.linkedin.com/learning/videos")
-        warn "Dropped video item."
-        next
-      end
 
       footer = html.css('.lls-card-detail-card-body__footer')[index]
       metadata = footer.at_css('.lls-card-meta-list')
@@ -59,6 +54,9 @@ module Parser
         course.minutes_remaining = minutes_remaining
         course.completion_date = completion_date
         results << course
+      elsif url.start_with?("https://www.linkedin.com/learning/videos")
+        # Videos are currently not supported.
+        results << nil
       end
     end
 
@@ -133,12 +131,13 @@ module Parser
   end
 
   def self.get_ratings(html)
-    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[0].text.to_s.strip.to_f
+    # Sometimes items will not have ratings for some reason.
+    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[0].text.to_s.strip.to_f rescue 0
   end
 
   def self.get_ratings_count(html)
     # Rating count is contained inside of parenthesis.
-    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[1].text.to_s.strip[1..-2].to_i
+    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[1].text.to_s.strip[1..-2].to_i rescue 0
   end
 
   def self.get_minutes(html)
@@ -164,7 +163,7 @@ module Parser
     elsif list.xpath('./li').size == 3
       date = list.xpath('./li')[2].text.to_s.strip
     end
-    Date.strptime(date.split(' ')[1].strip, "%m/%d/%Y") unless date.nil?
+    Date.strptime(date.split(' ')[1].strip, "%m/%d/%Y")
   end
 
   def self.get_provider(html)

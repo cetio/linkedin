@@ -8,6 +8,7 @@ class Course
   # If completed, minutes_remaining is nil.
   # If in progress, completion_date is nil.
   # TODO: learning_path || nil
+  # TODO: saved
   attr_accessor :url, :title, :minutes_remaining, :completion_date, :authors, :difficulty, :updated_date, :ratings, :ratings_count, :certified, :credits
 
   def initialize(linkedin = nil)

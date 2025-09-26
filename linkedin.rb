@@ -3,10 +3,10 @@ require 'nokogiri'
 require 'json'
 require 'optparse'
 require 'time'
+require 'date'
 require_relative 'parser'
 require_relative 'course'
 require_relative 'path'
-require 'date'
 
 class LinkedIn
   attr_accessor :cache, :cache_dir
@@ -115,63 +115,56 @@ class LinkedIn
   end
 
   def learning_show_more()
-    max_attempts = 5
-    attempts = 0
+    # We do this because this only applies to learning history.
+    btn = @driver.find_element(:xpath, "//button[@aria-label='Show more learning history']") rescue nil
+
+    @wait.until {
+      btn.displayed? && btn.enabled? && btn.attribute('aria-disabled') != 'true'
+    } rescue return false
+
+    @driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", btn)
+    sleep 0.05
 
     begin
-      attempts += 1
-
-      btn = nil
-      begin
-        btn = @driver.find_element(:xpath, "//button[@aria-label='Show more learning history']")
-        return false if btn.nil?
-      rescue Selenium::WebDriver::Error::NoSuchElementError
-        return false
-      end
-
-      begin
-        @wait.until {
-          btn.displayed? && btn.enabled? && btn.attribute('aria-disabled') != 'true'
-        }
-      rescue Selenium::WebDriver::Error::TimeoutError
-        return false
-      end
-
-      @driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", btn)
+      @driver.action.move_to(btn).perform
       sleep 0.05
+      btn.click()
+      return true
+    rescue
+      false
+    end
 
-      begin
-        @driver.action.move_to(btn).perform
-        sleep 0.05
-        btn.click
-        return true
-      rescue Selenium::WebDriver::Error::ElementClickInterceptedError, Selenium::WebDriver::Error::StaleElementReferenceError
-      end
+    begin
+      @driver.execute_script("arguments[0].click();", btn)
+      return true
+    rescue
+      false
+    end
+  end
 
-      begin
-        @driver.execute_script("arguments[0].click();", btn)
-        return true
-      rescue => js_err
-        # Give a tiny pause and retry if attempts remain.
-        sleep 0.2
-        if attempts < max_attempts
-          retry
-        else
-          warn "Failed to click show more: #{js_err.class}: #{js_err.message}"
-          return false
-        end
-      end
+  def learning_count(variety)
+    raise "Unsupported variety, only 'all', 'completed', 'in-progress', and 'saved' are supported!" unless
+      variety == 'all' ||
+      variety == 'completed' ||
+      variety == 'in-progress' ||
+      variety == 'saved'
 
+    if variety == 'all'
+      return learning_count('completed') + learning_count('in-progress') + learning_count('saved')
+    end
+
+    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/#{variety}")
+    # TODO: Rate limit handling.
+    @wait.until {
+      @driver.find_element(xpath: "//*[@id='hue-tabs-ember62-tab-me.my-library.#{variety}']")
+    }
+
+    begin
+      span = @driver.find_element(xpath: "//*[@id='hue-tabs-ember62-tab-me.my-library.#{variety}']").find_element(tag_name: 'span')
+      span.text.to_s.strip.match(/(\d+)/)[0].to_i
     rescue Selenium::WebDriver::Error::StaleElementReferenceError
-      if attempts < max_attempts
-        sleep 0.1
-        retry
-      end
-      warn "Failed to click show more: element went stale repeatedly"
-      return false
-    rescue => e
-      warn "Failed to click show more: #{e.class}: #{e.message}"
-      return false
+      # TODO: This can cause a stack overflow.
+      learning_count(variety)
     end
   end
 
@@ -186,66 +179,28 @@ class LinkedIn
       return learning_collect('completed') + learning_collect('in-progress') + learning_collect('saved')
     end
 
-    # TODO: This needs to make sure the page loads before waiting and it fails on saved library items.
-    # TODO: This needs to be able to handle errors/rate limiting on the page.
-    # TODO: This may not be collecting all items correctly and the logic is quite poor.
-    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/#{variety}")
+    items = []
+    # This will also navigate us to the page.
+    count = learning_count(variety)
     @wait.until {
       @driver.find_elements(css: '.lls-card-headline').any?
     }
 
-    items = []
     loop do
       scroll_dynamic()
-      @wait.until {
-        @driver.find_elements(css: '.lls-card-headline').length > items.size
-      }
-
-      state = learning_show_more()
-      sleep 0.5 unless state
+      learning_show_more() if variety == 'completed'
 
       html = Nokogiri::HTML(@driver.page_source)
-      new_items = Parser.extract(html, self)
-
-      # Add new items, avoiding duplicates
-      new_items.each do |item|
-        next if items.any? { |existing| existing.url == item.url }
-        items << item
+      Parser.extract(html, self).each() do |item|
+        # This is slow but scraping is slower.
+        next if items.any? { |i| i.url == item.url }
+        items << item unless item.nil?
+        count -= 1
       end
 
-      break unless state
+      break if count <= 0
     end
 
-    items
-  end
-
-  def learning_in_progress()
-    @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/in-progress")
-    @wait.until {
-      @driver.find_elements(css: '.lls-card-headline').any?
-    }
-
-    items = []
-    loop do
-      scroll_dynamic()
-      @wait.until {
-        @driver.find_elements(css: '.lls-card-headline').length > items.size
-      }
-
-      state = learning_show_more()
-      sleep 0.5 unless state
-
-      html = Nokogiri::HTML(@driver.page_source)
-      new_items = Parser.extract(html, self)
-
-      # Add new items, avoiding duplicates
-      new_items.each do |item|
-        next if items.any? { |existing| existing.url == item.url }
-        items << item
-      end
-
-      break unless state
-    end
     items
   end
 end
