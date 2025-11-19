@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 require 'selenium-webdriver'
 require 'nokogiri'
 require 'json'
@@ -51,6 +52,8 @@ class LinkedIn
     @wait = Selenium::WebDriver::Wait.new(timeout: 12)
     @cache_dir = cache_dir
     @cache = load_cache()
+
+    raise 'Password or email is nil, have you forgotten to provide one of the values?' if email.nil? != password.nil?
 
     unless email.nil? || password.nil?
       begin

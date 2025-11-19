@@ -34,7 +34,7 @@ def start_driver(headless, datadir)
     "--disable-dev-shm-usage",
     "--disable-extensions",
     "--window-size=1366,768",
-    "--user-data-dir=/home/cet/.config/thorium/",
+    "--user-data-dir=#{datadir}",
     "--profile-directory=Default"
   ].each { |a| opts.add_argument(a) }
 
