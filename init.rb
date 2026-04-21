@@ -58,7 +58,7 @@ begin
   )
 
   # TODO: Automatically propagate all data? Paths should go last otherwise it can be ungodly slow.
-  items = linkedin.learning_collect('saved')
+  items = linkedin.learning_collect('completed')
   cached = items.sum { |item| linkedin.is_cached?(item.url) ? 1 : 0 }
   puts "Collected #{items.size} items, #{cached} cached."
   eta_secs = (items.size - cached) * 4 + (((items.size - cached) / 10) * 30)

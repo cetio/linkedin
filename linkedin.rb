@@ -159,11 +159,13 @@ class LinkedIn
     @driver.navigate.to("https://www.linkedin.com/learning/me/my-library/#{variety}")
     # TODO: Rate limit handling.
     @wait.until {
-      @driver.find_element(xpath: "//*[@id='hue-tabs-ember62-tab-me.my-library.#{variety}']")
+      @driver.find_element(xpath: "//*[@href='/learning/me/my-library/#{variety}']") && 
+      @driver.find_element(xpath: "//*[@href='/learning/me/my-library/#{variety}']").find_elements(tag_name: 'span').any? &&
+      @driver.find_element(xpath: "//*[@href='/learning/me/my-library/#{variety}']").find_elements(tag_name: 'span').first.text.to_s.strip.match(/(\d+)/)
     }
 
     begin
-      span = @driver.find_element(xpath: "//*[@id='hue-tabs-ember62-tab-me.my-library.#{variety}']").find_element(tag_name: 'span')
+      span = @driver.find_element(xpath: "//*[@href='/learning/me/my-library/#{variety}']").find_element(tag_name: 'span')
       span.text.to_s.strip.match(/(\d+)/)[0].to_i
     rescue Selenium::WebDriver::Error::StaleElementReferenceError
       # TODO: This can cause a stack overflow.
