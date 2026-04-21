@@ -30,7 +30,7 @@ class Course
     end
 
     @linkedin.wait.until {
-      @linkedin.driver.find_elements(css: '.classroom-workspace-overview__header').any? ||
+      @linkedin.driver.find_elements(css: '.course-overview-header__entity-link').any? ||
       @linkedin.driver.find_elements(css: '.error-body__content').any?
     }
 
@@ -44,7 +44,7 @@ class Course
       navigate()
     end
 
-    until @linkedin.driver.find_elements(css: '.classroom-workspace-overview__details-meta li:nth-child(2)').any?
+    until @linkedin.driver.find_elements(css: '.course-overview-header__meta-list li:nth-child(3)').any?
       @linkedin.humanized_sleep(1, 2)
       navigate()
     end
@@ -118,7 +118,7 @@ class Course
     @minutes_remaining = hash["minutes_remaining"]
     @difficulty = hash["difficulty"]
     @updated_date = hash["updated_date"]
-    @updated_date = hash["completion_date"]
+    @completion_date = hash["completion_date"]
     @ratings = hash["ratings"]
     @ratings_count = hash["ratings_count"]
     @certified = hash["certified"]

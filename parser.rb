@@ -126,6 +126,8 @@ module Parser
   end
 
   def self.get_authors(html)
+    cards = html.css('.course-overview-author-cards__card-title')
+    return cards.map { |c| c.text.to_s.strip }.reject(&:empty?).join(' and ') if cards.any?
     html.at_css(".classroom-authors-summary__names").text.to_s.strip.split(' and ') rescue
     html.at_css(".instructor__name").text.to_s.strip.split("\n")[0] rescue
     html.at_css(".classroom-content-provider__metadata").at_css("._bodyText_1e5nen").text.to_s.strip.sub(/^Author: /, '') rescue nil
@@ -133,38 +135,42 @@ module Parser
 
   def self.get_ratings(html)
     # Sometimes items will not have ratings for some reason.
-    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[0].text.to_s.strip.to_f rescue 0
+    html.at_css('.ratings-meta__average-rating').text.to_s.strip[/[\d.]+/].to_f rescue 0
   end
 
   def self.get_ratings_count(html)
-    # Rating count is contained inside of parenthesis.
-    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[1].text.to_s.strip[1..-2].to_i rescue 0
+    # e.g. "1,545 ratings"
+    html.at_css('.ratings-meta__ratings-count').text.to_s.strip.gsub(',', '')[/\d+/].to_i rescue 0
+  end
+
+  # Meta list ordering is not stable; identify each field by content pattern.
+  DIFFICULTY_LEVELS = %w[Beginner Intermediate Advanced General].freeze
+
+  def self.meta_items(html)
+    list = html.at_css(".course-overview-header__meta-list")
+    return [] unless list
+    list.xpath('./li').map { |li| li.text.to_s.strip }
   end
 
   def self.get_minutes(html)
-    list = html.at_css(".classroom-workspace-overview__details-meta")
-    dur = list.xpath('./li')[0].text.to_s.strip
-    hours = dur[/(\d+)h/, 1].to_i
-    mins = dur[/(\d+)m/, 1].to_i
+    dur = meta_items(html).find { |t| t =~ /\d+\s*[hms]/ }
+    return 0 unless dur
+    hours = dur[/(\d+)\s*h/, 1].to_i
+    mins = dur[/(\d+)\s*m/, 1].to_i
     hours * 60 + mins
   end
 
   def self.get_difficulty(html)
-    list = html.at_css(".classroom-workspace-overview__details-meta")
-    # Unfortunately, this could be wrong, but it's the best we can do.
-    return "General" if list.xpath('./li').size == 2
-    list.xpath('./li')[1].text.to_s.strip
+    items = meta_items(html)
+    found = items.find { |t| DIFFICULTY_LEVELS.include?(t) }
+    found || "General"
   end
 
   def self.get_updated_date(html)
-    list = html.at_css(".classroom-workspace-overview__details-meta")
-    date = nil
-    if list.xpath('./li').size == 2
-      date = list.xpath('./li')[1].text.to_s.strip
-    elsif list.xpath('./li').size == 3
-      date = list.xpath('./li')[2].text.to_s.strip
-    end
-    Date.strptime(date.split(' ')[1].strip, "%m/%d/%Y")
+    raw = meta_items(html).find { |t| t =~ /^(Updated|Released):/i }
+    return nil unless raw
+    date_str = raw.sub(/^[^:]+:\s*/, '').strip
+    Date.strptime(date_str, "%B %d, %Y") rescue nil
   end
 
   def self.get_provider(html)
