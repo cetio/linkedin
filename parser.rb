@@ -134,20 +134,29 @@ module Parser
   end
 
   def self.get_ratings(html)
-    # Sometimes items will not have ratings for some reason.
-    html.at_css('.ratings-meta__average-rating').text.to_s.strip[/[\d.]+/].to_f rescue 0
+    # New layout: ".ratings-meta__average-rating" -> "4.7 out of 5".
+    val = html.at_css('.ratings-meta__average-rating')&.text.to_s.strip[/[\d.]+/]
+    return val.to_f if val
+    # Old layout: first matching span held the bare rating number.
+    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[0].text.to_s.strip.to_f rescue 0
   end
 
   def self.get_ratings_count(html)
-    # e.g. "1,545 ratings"
-    html.at_css('.ratings-meta__ratings-count').text.to_s.strip.gsub(',', '')[/\d+/].to_i rescue 0
+    # New layout: ".ratings-meta__ratings-count" -> e.g. "1,545 ratings".
+    raw = html.at_css('.ratings-meta__ratings-count')&.text
+    if raw
+      return raw.to_s.gsub(',', '')[/\d+/].to_i
+    end
+    # Old layout: second span held the count wrapped in parentheses.
+    html.css("span._bodyText_1e5nen._default_1i6ulk._sizeMedium_1e5nen")[1].text.to_s.strip[1..-2].to_i rescue 0
   end
 
   # Meta list ordering is not stable; identify each field by content pattern.
   DIFFICULTY_LEVELS = %w[Beginner Intermediate Advanced General].freeze
 
   def self.meta_items(html)
-    list = html.at_css(".course-overview-header__meta-list")
+    list = html.at_css(".course-overview-header__meta-list") ||
+           html.at_css(".classroom-workspace-overview__meta-list")
     return [] unless list
     list.xpath('./li').map { |li| li.text.to_s.strip }
   end
@@ -167,10 +176,20 @@ module Parser
   end
 
   def self.get_updated_date(html)
-    raw = meta_items(html).find { |t| t =~ /^(Updated|Released):/i }
+    raw = meta_items(html).find { |t| t =~ /^(Updated|Released)\b/i }
     return nil unless raw
-    date_str = raw.sub(/^[^:]+:\s*/, '').strip
-    Date.strptime(date_str, "%B %d, %Y") rescue nil
+    # Strip leading "Updated"/"Released" plus optional colon/whitespace.
+    date_str = raw.sub(/^(Updated|Released)\b[:\s]*/i, '').strip
+    # Try new "Month D, YYYY" format, then fall back to old "M/D/YYYY".
+    begin
+      Date.strptime(date_str, "%B %d, %Y")
+    rescue
+      begin
+        Date.strptime(date_str, "%m/%d/%Y")
+      rescue
+        Date.parse(date_str) rescue nil
+      end
+    end
   end
 
   def self.get_provider(html)

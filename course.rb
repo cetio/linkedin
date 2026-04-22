@@ -31,6 +31,7 @@ class Course
 
     @linkedin.wait.until {
       @linkedin.driver.find_elements(css: '.course-overview-header__entity-link').any? ||
+      @linkedin.driver.find_elements(css: '.classroom-workspace-overview__header').any? ||
       @linkedin.driver.find_elements(css: '.error-body__content').any?
     }
 
@@ -44,7 +45,7 @@ class Course
       navigate()
     end
 
-    until @linkedin.driver.find_elements(css: '.course-overview-header__meta-list li:nth-child(3)').any?
+    until @linkedin.driver.find_elements(css: '.course-overview-header__meta-list li:nth-child(3), .classroom-workspace-overview__meta-list li:nth-child(2)').any?
       @linkedin.humanized_sleep(1, 2)
       navigate()
     end
