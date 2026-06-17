@@ -1,4 +1,4 @@
-# LinkedIn Ruby
+# LinkedIn Learnt
 
 > [!WARNING]
 > This tool is for personal use only! Scraping someone else's account or distributing scraped data is a violation of LinkedIn's terms of use and may be illegal in some jurisdictions. Use it responsibly, throttle your requests, and respect rate limits.
@@ -6,7 +6,7 @@
 > [!NOTE]
 > This project was written in 12 hours with no prior experience in Ruby or Selenium. I try my best, but any bugs or problems should be reported with an issue.
 
-LinkedIn Ruby (not the website) is a CLI tool and pseudo-library that fetches your LinkedIn Learning completed history and extracts course and learning path metadata into a simple cacheable JSON aggregate.
+LinkedIn Learnt is a CLI tool and pseudo-library that fetches your LinkedIn Learning completed history and extracts course and learning path metadata into a simple cacheable JSON aggregate.
 
 It's designed to be human-friendly, tolerant of LinkedIn's rate limits, and to avoid hammering the site unnecessarily.
 
@@ -100,4 +100,4 @@ Assuming no cached data, you can expect 100 courses to typically aggregate in 10
 
 ## License
 
-LinkedIn Ruby (again, not the website) is licensed under [AGPL 3.0](LICENSE.txt).
+LinkedIn Learnt is licensed under [AGPL 3.0](LICENSE.txt).
